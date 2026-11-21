@@ -1,525 +1,234 @@
-## Escopo do projeto
+# API de E-commerce (Node.js + Express + Sequelize)
 
-Para a implementação deste projeto vamo precisar usar as seguintes tecnologias:
+API REST para gerenciar **usuários**, **categorias** e **produtos** (com imagens, opções e categorias), protegida por **JWT**.
 
-- **Node.js** para fornecer a possibilidade de executar JS em um servidor
-- **Express.js** para criar rotas de api
-- **Dotenv** para criarmos configurações com mais facilidade e segurança
-- **Nodemon** para termos mais produtividade em nosso ambiente de desenvolvimento
-- **MySQL** para persistência de dados
-- **Sequelize** para termos mais produtividade ao lidar com o banco de dados
-- **JWT** para adicionar segurança e limitar o acesso nas rotas de API
-- **JEST** para nos ajudar a testar e manter a qualidade do código
+## Tecnologias
 
-## Estrutura de diretório
+| Tecnologia                                                                   | Para que serve                                          |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [Node.js](https://nodejs.org/)                                               | Executar JavaScript no servidor                         |
+| [Express.js](https://expressjs.com/)                                         | Criar as rotas da API                                   |
+| [Dotenv](https://github.com/motdotla/dotenv)                                 | Configurações por variáveis de ambiente                 |
+| [Nodemon](https://nodemon.io/)                                               | Reiniciar o servidor automaticamente em desenvolvimento |
+| [MySQL](https://www.mysql.com/)                                              | Persistência dos dados                                  |
+| [Sequelize](https://sequelize.org/)                                          | ORM para acessar o banco                                |
+| [JWT](https://jwt.io/) (`jsonwebtoken`)                                      | Autenticação e proteção das rotas                       |
+| [bcrypt](https://github.com/kelektiv/node.bcrypt.js)                         | Hash das senhas                                         |
+| [Jest](https://jestjs.io/) + [Supertest](https://github.com/ladjs/supertest) | Testes automatizados                                    |
+
+## Requisitos
+
+- Node.js 18 ou superior
+- MySQL 8 (ou compatível) em execução
+
+## Como executar
+
+1. **Instale as dependências**
+
+   ```bash
+   npm install
+   ```
+
+2. **Crie o banco de dados** no MySQL (o Sequelize cria as tabelas, mas não o banco):
+
+   ```sql
+   CREATE DATABASE project_db;
+   ```
+
+3. **Configure o arquivo `.env`** na raiz do projeto:
+
+   ```env
+   PORT=3000
+
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_NAME=project_db
+   DB_USER=root
+   DB_PASSWORD=sua_senha_do_mysql
+
+   JWT_SECRET=troque-por-um-segredo-longo-e-aleatorio
+   JWT_EXPIRES_IN=1h
+
+   # Opcional: pasta onde as imagens dos produtos são salvas (padrão: ./media)
+   # MEDIA_DIR=media
+   ```
+
+   > O `.env` está no `.gitignore`. Nunca publique o `JWT_SECRET` nem a senha do banco.
+
+4. **Inicie o servidor**
+
+   ```bash
+   npm run dev     # desenvolvimento (nodemon)
+   npm start       # produção
+   ```
+
+   Ao subir, o servidor conecta no banco, cria as tabelas que ainda não existem e informa a porta em que está rodando.
+
+### Scripts
+
+| Comando       | O que faz                     |
+| ------------- | ----------------------------- |
+| `npm run dev` | Inicia o servidor com nodemon |
+| `npm start`   | Inicia o servidor com Node    |
+| `npm test`    | Roda os testes com Jest       |
+
+## Testes
+
+```bash
+npm test
+```
+
+Os testes usam **SQLite em memória** (o Jest define `NODE_ENV=test` sozinho), então **não precisam de MySQL** e não alteram o seu banco. As imagens dos testes são gravadas numa pasta temporária do sistema.
+
+## Estrutura de pastas
 
 ```
 project-root/
 ├── src/
 │   ├── config/
-│   ├── controllers/
+│   │   ├── database.js          # conexão Sequelize (MySQL; SQLite nos testes)
+│   │   └── media.js             # pasta onde as imagens são salvas
+│   ├── controllers/             # recebem a requisição e devolvem a resposta
 │   ├── middleware/
-│   ├── models/
-│   ├── routes/
-│   ├── services/
-│   ├── app.js
-│   └── server.js
-├── tests/
+│   │   ├── auth.js              # valida o JWT
+│   │   └── errorHandler.js      # converte erros em respostas JSON
+│   ├── models/                  # User, Category, Product, ProductImage,
+│   │                            # ProductOption, ProductCategory + associações
+│   ├── routes/                  # rotas de /v1/user, /v1/category e /v1/product
+│   ├── services/                # regras de negócio e validações
+│   ├── app.js                   # configuração do Express
+│   └── server.js                # conecta no banco e sobe o servidor
+├── tests/                       # testes de models e de rotas
+├── media/                       # imagens enviadas (criada automaticamente)
 ├── .env
 ├── .gitignore
 └── package.json
 ```
 
-## Response status code
+## Banco de dados
 
-- [200 OK](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/Status/200)
-  - Indica que a API REST executou com êxito qualquer ação solicitada pelo cliente
-  - Ao contrário do código de status 204, uma 200 deve incluir um corpo de resposta
-- [201 CREATED](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/Status/201)
-  - Indica que a requisição foi bem sucedida e que um novo recurso foi criado
-- [204 No content](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/Status/204)
-  - O código de status 204 geralmente é enviado em resposta a uma solicitação PUT ou DELETE quando a API se recusa a retornar qualquer corpo de mensagem no response
-  - A resposta 204 NÃO DEVE incluir um corpo de mensagem
-- [400 Bad Request](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/Status/400)
-  - Indica que o servidor não pode ou não irá processar a requisição devido a alguma coisa que foi entendida como um erro do cliente
-- [401 Unauthorized](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/Status/401)
-  - Indica que a solicitação não foi aplicada porque não possui credenciais de autenticação válidas para o recurso de destino
-- [404 Not Found](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/Status/404)
-  - Indica que o servidor não conseguiu encontrar o recurso solicitado
+Todas as tabelas têm `created_at` e `updated_at` (`timestamps: true`).
 
-## Seção 01 - Implementar o banco de dados da aplicação
+| Tabela               | Colunas principais                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `users`              | `id`, `firstname`, `surname`, `email`, `password` (hash bcrypt)                                                                    |
+| `categories`         | `id`, `name`, `slug`, `use_in_menu` (padrão `0`)                                                                                   |
+| `products`           | `id`, `enabled` (padrão `0`), `name`, `slug`, `use_in_menu`, `stock` (padrão `0`), `description`, `price`, `price_with_discount`   |
+| `product_images`     | `id`, `product_id` (FK), `enabled` (padrão `0`), `path`                                                                            |
+| `product_options`    | `id`, `product_id` (FK), `title`, `shape` (`square`/`circle`), `radius`, `type` (`text`/`color`), `values` (separados por vírgula) |
+| `product_categories` | `product_id` (FK), `category_id` (FK)                                                                                              |
 
-<details>
-  <summary><strong>Requisito 01 - Criar a tabela de usuários</strong></summary><br>
+As chaves estrangeiras usam `ON DELETE CASCADE`.
 
-O objetivo deste requisito é criar a tabela de usuários no banco de dados utilizando o Sequelize ORM. A tabela deve conter as colunas a seguir:
+## Autenticação
 
-- **id**: Coluna do tipo INTEGER que representa a chave primária da tabela. Seu valor deve ser incrementado automaticamente pelo banco de dados
-- **firstname**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o primeiro nome do usuário
-- **surname**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o sobrenome do usuário.
-- **email**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o endereço de email do usuário
-- **password**: Coluna do tipo STRING e de preenchimento obrigatório que armazena a senha do usuário. O valor a ser armazenado deve ser o hash da senha gerado pelo pacote bcrypt.
+Os endpoints **POST, PUT e DELETE** exigem o cabeçalho:
 
-> Use a configuração `timestamps: true` do sequelize para gerar as colunas **created_at** e **updated_at**
-
-</details>
-
-<details>
-  <summary><strong>Requisito 02 - Criar a tabela de categorias</strong></summary><br>
-
-O objetivo deste requisito é criar a tabela de categorias no banco de dados utilizando o Sequelize ORM. A tabela deve conter as colunas a seguir:
-
-- **id**: Coluna do tipo INTEGER que representa a chave primária da tabela. Seu valor deve ser incrementado automaticamente pelo banco de dados
-- **name**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o nome da categoria
-- **slug**: Coluna do tipo STRING, e de preenchimento obrigatório que armazena o slug da categoria.
-- **use_in_menu**: Coluna do tipo BOOLEAN e de preenchimento opcional que define se a categoria pode ser exibida no menu. Valor padrão deve ser 0.
-
-> Use a configuração `timestamps: true` do sequelize para gerar as colunas **created_at** e **updated_at**
-
-</details>
-
-<details>
-  <summary><strong>Requisito 03 - Criar a tabela de produtos</strong></summary><br>
-
-O objetivo deste requisito é criar a tabela de produtos no banco de dados utilizando o Sequelize ORM. A tabela deve conter as colunas a seguir:
-
-- **id**: Coluna do tipo INTEGER que representa a chave primária da tabela. Seu valor deve ser incrementado automaticamente pelo banco de dados
-- **enabled**: Coluna do tipo BOOLEAN e de preenchimento opcional que define se o produto está habilitado (1) ou desabilitado (0). Valor padrão deve ser 0.
-- **name**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o nome do produto.
-- **slug**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o slug do produto.
-- **use_in_menu**: Coluna do tipo BOOLEAN e de preenchimento opcional que define se a categoria pode ser exibida no menu. Valor padrão deve ser 0.
-- **stock**: Coluna do tipo INTEGER e de preenchimento opcional que armazena a quantidade de produto disponível. Valor padrão deve ser 0.
-- **description**: Coluna do tipo STRING e de preenchimento opcional que armazena a descrição do produto.
-- **price**: Coluna do tipo FLOAT e de preenchimento obrigatório que armazena o preço do produto.
-- **price_with_discount**: Coluna do tipo FLOAT e de preenchimento obrigatório que armazena o preço do produto com desconto.
-
-> Use a configuração `timestamps: true` do sequelize para gerar as colunas **created_at** e **updated_at**
-
-</details>
-
-<details>
-  <summary><strong>Requisito 04 - Criar a tabela de imagens do produto</strong></summary><br>
-
-O objetivo deste requisito é criar a tabela de imagens dos produtos no banco de dados utilizando o Sequelize ORM. A tabela deve conter as colunas a seguir:
-
-- **id**: Coluna do tipo INTEGER que representa a chave primária da tabela. Seu valor deve ser incrementado automaticamente pelo banco de dados
-- **product_id**: Coluna do tipo INTEGER que representa a chave estrangeira da tabela. Seu valor deve ser uma referência de um valor existente na primary key da tabela de produtos
-- **enabled**: Coluna do tipo BOOLEAN e de preenchimento opcional que define se o produto está habilitado (1) ou desabilitado (0). Valor padrão deve ser 0.
-- **path**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o caminho relativo da imagem salva no servidor.
-
-</details>
-
-<details>
-  <summary><strong>Requisito 05 - Criar a tabela de opções do produto</strong></summary><br>
-
-O objetivo deste requisito é criar a tabela de opções do produto no banco de dados utilizando o Sequelize ORM. A tabela deve conter as colunas a seguir:
-
-- **id**: Coluna do tipo INTEGER que representa a chave primária da tabela. Seu valor deve ser incrementado automaticamente pelo banco de dados
-- **product_id**: Coluna do tipo INTEGER e de preenchimento obrigatório que representa a chave estrangeira da tabela. Seu valor deve ser uma referência de um valor existente na primary key da tabela de produtos
-- **title**: Coluna do tipo STRING e de preenchimento obrigatório que armazena o título da opção.
-- **shape**: Coluna do tipo ENUM e de preenchimento opcional que armazena o formato em que a opção do produto deve ser renderizada. Essa coluna deve aceitar apenas dois valores (square ou circle). Valor padrão deve ser "square"
-- **radius**: Coluna do tipo INTEGER e de preenchimento opcional que armazena o valor do `border-radius` da opção do produto. Valor padrão deve ser 0
-- **type**: Coluna do tipo ENUM e de preenchimento opcional que armazena o tipo do input usado como opção. Essa coluna deve aceitar apenas dois valores (text ou color). Valor padrão deve ser "text"
-- **values**: Coluna do tipo STRING e de preenchimento obrigatório que armazena todas as opção do produto separadas por vírgula.
-
-</details>
-
-<details>
-  <summary><strong>Requisito 06 - Criar a tabela de produtos e categoria</strong></summary><br>
-
-O objetivo deste requisito é criar a tabela de opções do produto no banco de dados utilizando o Sequelize ORM. A tabela deve conter as colunas a seguir:
-
-- **product_id**: Coluna do tipo INTEGER e de preenchimento obrigatório que representa a chave estrangeira da tabela. Seu valor deve ser referência de um valor existente na primary key da tabela de produtos
-- **category_id**: Coluna do tipo INTEGER e de preenchimento obrigatório que representa a chave estrangeira da tabela. Seu valor deve ser referência de um valor existente na primary key da tabela de categorias
-
-</details>
-
-## Seção 02 - Implementar endpoints para o CRUD de usuarios
-
-<details>
-  <summary><strong>Requisito 01 - Criar endpoint para obter informações do usuário pelo ID</strong></summary><br>
-  
-- GET /v1/user/:id
-
-**Response body**
-
-```json
-{
-  "id": 1,
-  "firstname": "user firstname",
-  "surname": "user surname",
-  "email": "user@mail.com"
-}
+```
+Authorization: Bearer <jwt>
 ```
 
-**Response Status Code**
+| Situação                                              | Status             |
+| ----------------------------------------------------- | ------------------ |
+| Cabeçalho ausente ou fora do formato `Bearer <token>` | `400 Bad Request`  |
+| Token inválido, adulterado ou expirado                | `401 Unauthorized` |
 
-- 200 OK - Deve ser retornado quando a requisição foi bem sucedida
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
+Exceções públicas (não exigem token): `POST /v1/user` (cadastro) e `POST /v1/user/token` (geração do token). Todos os `GET` também são públicos.
 
-<details>
-  <summary><strong>Requisito 02 - Criar endpoint de cadastro de usuário</strong></summary><br>
-  
-- POST /v1/user
+**Fluxo básico:**
 
-**Headers**
+```bash
+# 1. Cadastrar um usuário
+curl -X POST http://localhost:3000/v1/user \
+  -H "Content-Type: application/json" \
+  -d '{"firstname":"Maria","surname":"Silva","email":"maria@mail.com","password":"123@123","confirmPassword":"123@123"}'
 
-- Content-type: application/json
+# 2. Gerar o token
+curl -X POST http://localhost:3000/v1/user/token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"maria@mail.com","password":"123@123"}'
+# => { "token": "<JWT>" }
 
-**Payload**
-
-```json
-{
-  "firstname": "user firstname",
-  "surname": "user surname",
-  "email": "user@mail.com",
-  "password": "123@123",
-  "confirmPassword": "123@123"
-}
+# 3. Usar o token em uma rota protegida
+curl -X POST http://localhost:3000/v1/category \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <JWT>" \
+  -d '{"name":"Shoes","slug":"shoes","use_in_menu":true}'
 ```
 
-**Response Status Code**
+## Endpoints
 
-- 201 Created - Deve ser retornado quando o cadastro for bem sucedido
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-</details>
+### Usuários
 
-<details>
-  <summary><strong>Requisito 04 - Criar endpoint atualizar usuário</strong></summary><br>
+| Método   | Rota             | Token | Respostas          |
+| -------- | ---------------- | ----- | ------------------ |
+| `GET`    | `/v1/user/:id`   | não   | 200, 404           |
+| `POST`   | `/v1/user`       | não   | 201, 400           |
+| `POST`   | `/v1/user/token` | não   | 200, 400           |
+| `PUT`    | `/v1/user/:id`   | sim   | 204, 400, 401, 404 |
+| `DELETE` | `/v1/user/:id`   | sim   | 204, 401, 404      |
 
-- PUT /v1/user/:id
+### Categorias
 
-**Headers**
+| Método   | Rota                  | Token | Respostas          |
+| -------- | --------------------- | ----- | ------------------ |
+| `GET`    | `/v1/category/search` | não   | 200, 400           |
+| `GET`    | `/v1/category/:id`    | não   | 200, 404           |
+| `POST`   | `/v1/category`        | sim   | 201, 400, 401      |
+| `PUT`    | `/v1/category/:id`    | sim   | 204, 400, 401, 404 |
+| `DELETE` | `/v1/category/:id`    | sim   | 204, 401, 404      |
 
-- Content-type: application/json
+### Produtos
 
-**Payload**
+| Método   | Rota                 | Token | Respostas          |
+| -------- | -------------------- | ----- | ------------------ |
+| `GET`    | `/v1/product/search` | não   | 200, 400           |
+| `GET`    | `/v1/product/:id`    | não   | 200, 404           |
+| `POST`   | `/v1/product`        | sim   | 201, 400, 401      |
+| `PUT`    | `/v1/product/:id`    | sim   | 204, 400, 401, 404 |
+| `DELETE` | `/v1/product/:id`    | sim   | 204, 401, 404      |
 
-```json
-{
-  "firstname": "user firstname",
-  "surname": "user surname",
-  "email": "user@mail.com"
-}
-```
+> Nos endpoints protegidos, a ausência do cabeçalho `Authorization` retorna **400** (veja [Autenticação](#autenticação)).
 
-**Response Status Code**
+## Busca
 
-- 204 No Content - Deve ser retornado quando a requisição foi bem sucedida mas nenhum corpo deve ser retornado.
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
+### `GET /v1/category/search`
 
-<details>
-  <summary><strong>Requisito 05 - Criar endpoint de deletar usuário</strong></summary><br>
+| Parâmetro     | Descrição                                    | Padrão |
+| ------------- | -------------------------------------------- | ------ |
+| `limit`       | Itens por página. Use `-1` para buscar todos | `12`   |
+| `page`        | Página (ignorada quando `limit=-1`)          | `1`    |
+| `fields`      | Campos retornados, ex.: `name,slug`          | todos  |
+| `use_in_menu` | `true` filtra as categorias do menu          | –      |
 
-- DELETE /v1/user/:id
+### `GET /v1/product/search`
 
-**Headers**
+| Parâmetro      | Descrição                                                                                                                                       | Exemplo                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `limit`        | Itens por página. Use `-1` para buscar todos (padrão `12`)                                                                                      | `limit=30`                 |
+| `page`         | Página (padrão `1`; ignorada com `limit=-1`)                                                                                                    | `page=2`                   |
+| `fields`       | Campos retornados: `id`, `enabled`, `name`, `slug`, `stock`, `description`, `price`, `price_with_discount`, `category_ids`, `images`, `options` | `fields=name,images,price` |
+| `match`        | Termo no nome ou na descrição (sem diferenciar maiúsculas)                                                                                      | `match=Tênis`              |
+| `category_ids` | Produtos de qualquer uma das categorias                                                                                                         | `category_ids=15,24`       |
+| `price-range`  | Faixa de preço (`price`), limites inclusivos                                                                                                    | `price-range=100-200`      |
+| `option[<id>]` | Produtos cuja opção `<id>` tenha qualquer um dos valores                                                                                        | `option[45]=GG,PP`         |
 
-- Content-type: application/json
+Os filtros se combinam com **E** (o produto precisa passar por todos). Parâmetros inválidos retornam `400`.
 
-**Response Status Code**
-
-- 204 No Content - Deve ser retornado quando a requisição foi bem sucedida mas nenhum corpo deve ser retornado.
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-
-</details>
-
-## Seção 03 - Implementar endpoints para o CRUD de categorias
-
-<details>
-  <summary><strong>Requisito 01 - Criar endpoint para obter uma lista de categorias</strong></summary><br>
-
-- GET /v1/category/search
-
-**Query params**
-
-- `limit=-1`
-  - Query string para definir o limit de itens por página
-  - Use `-1` como valor para buscar todos os itens
-  - Padrão: 12
-- `page=1`
-  - Query string para definir a paginação dos dados retornados
-  - Quando `limit` receber `-1` a opção de `page` não tem nenhum efeito no resultado da busca e pode ser omitida da query string
-  - Padrão: 1
-- `fields=name,slug`
-  - Query string para limitar quais campos serão retornados
-- `use_in_menu=true`
-  - Query string para filtrar apenas as categorias que podem aparecer no menu
-
-**Response body**
+A resposta segue o formato:
 
 ```json
 {
-  "data": [
-    {
-      "id": 1,
-      "name": "Shoes",
-      "slug": "shoes",
-      "use_in_menu": true
-    },
-    {
-      "id": 2,
-      "name": "Offers",
-      "slug": "offers",
-      "use_in_menu": true
-    },
-    {
-      "id": 3,
-      "name": "Black Friday",
-      "slug": "black-friday",
-      "use_in_menu": false
-    }
-  ],
-  "total": 10,
-  "limit": -1,
+  "data": [{ "id": 1, "name": "Produto 01", "...": "..." }],
+  "total": 120,
+  "limit": 12,
   "page": 1
 }
 ```
 
-**Response Status Code**
+## Produtos: cadastro e atualização
 
-- 200 OK - Deve ser retornado quando a requisição foi bem sucedida
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-</details>
-
-<details>
-  <summary><strong>Requisito 02 - Criar endpoint para obter informações da categoria pelo ID</strong></summary><br>
-
-- GET /v1/category/:id
-
-**Response body**
-
-```json
-{
-  "id": 1,
-  "name": "Shoes",
-  "slug": "shoes",
-  "use_in_menu": true
-}
-```
-
-**Response Status Code**
-
-- 200 OK - Deve ser retornado quando a requisição foi bem sucedida
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
-
-<details>
-  <summary><strong>Requisito 03 - Criar endpoint de cadastro de categoria</strong></summary><br>
-
-- POST /v1/category
-
-**Headers**
-
-- Content-type: application/json
-
-**Payload**
-
-```json
-{
-  "name": "Shoes",
-  "slug": "shoes",
-  "use_in_menu": true
-}
-```
-
-**Response Status Code**
-
-- 201 Created - Deve ser retornado quando o cadastro for bem sucedido
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-</details>
-
-<details>
-  <summary><strong>Requisito 04 - Criar endpoint de atualização de categoria</strong></summary><br>
-
-- PUT /v1/category/:id
-
-**Headers**
-
-- Content-type: application/json
-
-**Payload**
-
-```json
-{
-  "name": "Shoes",
-  "slug": "shoes",
-  "use_in_menu": true
-}
-```
-
-**Response Status Code**
-
-- 204 No Content - Deve ser retornado quando a requisição foi bem sucedida mas nenhum corpo deve ser retornado.
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
-
-<details>
-  <summary><strong>Requisito 05 - Criar endpoint de deletar categoria</strong></summary><br>
-
-- DELETE /v1/category/:id
-
-**Headers**
-
-- Content-type: application/json
-
-**Response Status Code**
-
-- 204 No Content - Deve ser retornado quando a requisição foi bem sucedida mas nenhum corpo deve ser retornado.
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
-
-## Seção 04 - Implementar endpoints para o CRUD de produtos
-
-<details>
-  <summary><strong>Requisito 01 - Criar endpoint para obter uma lista de produtos</strong></summary><br>
-
-- GET /v1/product/search
-
-**Query params**
-
-- `limit=30`
-  - Query string para definir o limit de itens por página
-  - Use `-1` como valor para buscar todos os itens
-  - Padrão: 12
-- `page=2`
-  - Query string para definir a paginação dos dados retornados
-  - Quando `limit` receber `-1` a opção de `page` não tem nenhum efeito no resultado da busca e pode ser omitida da query string
-  - Padrão: 1
-- `fields=name,images,price`
-  - Query string para limitar quais campos serão retornados
-- `match=Tênis`
-  - Query string usada para filtrar o resultado de produtos por um termo que combine com o nome ou descrição do produto
-- `category_ids=15,24`
-  - Query string usada para filtrar o resultado de produtos pelo ID das categorias
-- `price-range=100-200`
-  - Query string para filtrar o resultado de produtos por uma determinada "janela" de preços
-- `option[45]=GG,PP`
-  - Query string para filtrar o resultado de produtos pelo valor das opções disponíveis
-
-**Response body**
-
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "enabled": true,
-      "name": "Produto 01",
-      "slug": "produto-01",
-      "stock": 10,
-      "description": "Descrição do produto 01",
-      "price": 119.90,
-      "price_with_discount": 99.90,
-      "category_ids": [1, 15, 24, 68],
-      "images": [
-        {
-          "id": 1,
-          "content": "https://store.com/media/product-01/image-01.png"
-        },
-        {
-          "id": 2,
-          "content": "https://store.com/media/product-01/image-02.png"
-        },
-        {
-          "id": 3,
-          "content": "https://store.com/media/product-01/image-02.jpg"
-        }
-      ],
-      "options": [
-        {
-          "id": 1
-          ...
-        },
-        {
-          "id": 2
-          ...
-        }
-      ]
-    }
-  ],
-  "total": 120,
-  "limit": 12,
-  "page": 1,
-}
-```
-
-**Response Status Code**
-
-- 200 OK - Deve ser retornado quando a requisição foi bem sucedida
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-</details>
-
-<details>
-  <summary><strong>Requisito 02 - Criar endpoint para obter informações do produto pelo ID</strong></summary><br>
-
-- GET /v1/product/:id
-
-**Response body**
-
-```json
-{
-  "id": 1,
-  "enabled": true,
-  "name": "Produto 01",
-  "slug": "product-01",
-  "stock": 10,
-  "description": "Descrição do produto 01",
-  "price": 119.90,
-  "price_with_discount": 99.90,
-  "category_ids": [1, 15, 24, 68],
-  "images": [
-    {
-      "id": 1,
-      "content": "https://store.com/media/product-01/image-01.png"
-    },
-    {
-      "id": 2,
-      "content": "https://store.com/media/product-01/image-02.png"
-    },
-    {
-      "id": 3,
-      "content": "https://store.com/media/product-01/image-02.jpg"
-    }
-  ],
-  "options": [
-    {
-      "id": 1
-      ...
-    },
-    {
-      "id": 2
-      ...
-    }
-  ]
-}
-```
-
-**Response Status Code**
-
-- 200 OK - Deve ser retornado quando a requisição foi bem sucedida
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
-
-<details>
-  <summary><strong>Requisito 03 - Criar endpoint de criação de produto</strong></summary><br>
-
-- POST /v1/product
-
-**Headers**
-
-- Content-type: application/json
-
-**Payload**
+### Corpo do `POST /v1/product`
 
 ```json
 {
@@ -530,167 +239,65 @@ O objetivo deste requisito é criar a tabela de opções do produto no banco de 
   "description": "Descrição do produto 01",
   "price": 119.9,
   "price_with_discount": 99.9,
-  "category_ids": [1, 15, 24, 68],
-  "images": [
-    {
-      "type": "image/png",
-      "content": "base64 da imagem 1"
-    },
-    {
-      "type": "image/png",
-      "content": "base64 da imagem 2"
-    },
-    {
-      "type": "image/jpg",
-      "content": "base64 da imagem 3"
-    }
-  ],
+  "category_ids": [1, 15],
+  "images": [{ "type": "image/png", "content": "<imagem em base64>" }],
   "options": [
     {
-      "title": "Cor",
+      "title": "Tamanho",
       "shape": "square",
       "radius": "4px",
       "type": "text",
-      "value": ["PP", "GG", "M"]
-    },
-    {
-      "title": "Tamanho",
-      "shape": "circle",
-      "type": "color",
-      "values": ["#000", "#333"]
+      "values": ["P", "M", "G"]
     }
   ]
 }
 ```
 
-**Response Status Code**
+- **Obrigatórios:** `name`, `slug`, `price` e `price_with_discount` (o desconto pode ser `0`).
+- **Opcionais:** `enabled` (padrão `false`), `stock` (padrão `0`), `description`, `category_ids`, `images` e `options`.
+- As categorias informadas precisam existir; caso contrário, `400`.
+- Textos aceitam até 255 caracteres.
+- A resposta `201` traz o produto completo, no mesmo formato de `GET /v1/product/:id`.
+- A criação é **atômica**: se algo falhar, nada é salvo (nem arquivos).
 
-- 201 Created - Deve ser retornado quando o cadastro for bem sucedido
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-</details>
+### Imagens
 
-<details>
-  <summary><strong>Requisito 04 - Criar endpoint de atualização de produto</strong></summary><br>
+- Enviadas em **base64** (com ou sem o prefixo `data:...;base64,`). Tipos aceitos: `image/png`, `image/jpg`, `image/jpeg`, `image/gif` e `image/webp`, com até 5 MB cada.
+- Os arquivos ficam em `media/` e o banco guarda o caminho relativo (ex.: `products/12/<uuid>.png`). O campo `content` retornado pela API é esse caminho, e a imagem pode ser aberta em `http://localhost:3000/media/<content>`.
 
-- PUT /v1/product/:id
+### Atualização (`PUT /v1/product/:id`)
 
-**Headers**
+`name`, `slug`, `price` e `price_with_discount` são obrigatórios. Os demais campos, se omitidos, **mantêm o valor atual**.
 
-- Content-type: application/json
+- **`category_ids`**: substitui a lista inteira (`[]` remove todas).
+- **`images`** (cada item):
+  - sem `id`, com `type` + `content` (base64): adiciona uma imagem;
+  - `{ "id": 2, "deleted": true }`: remove a imagem e o arquivo;
+  - `{ "id": 3, "content": "<base64>" }`: troca o arquivo (se `type` não vier, mantém a extensão);
+  - `{ "id": 1, "content": "<URL ou caminho atual>" }`: mantém a imagem como está;
+  - `{ "id": 1, "enabled": true }`: altera só o campo `enabled`.
+- **`options`** (cada item):
+  - sem `id`: cria uma opção (`title` e `values` obrigatórios);
+  - `{ "id": 1, "deleted": true }`: remove a opção;
+  - `{ "id": 2, "radius": "10px", "values": ["42/43"] }`: atualiza só os campos enviados.
+- Ids de imagem ou opção que não pertencem ao produto retornam `400`.
+- Em `options`, o valor pode vir em `values` ou `value`, e o `radius` aceita número ou texto como `"4px"`.
 
-**Payload**
+## Padrão de respostas
 
-```json
-  {
-    "enabled": true,
-    "name": "Produto 01 atualizado",
-    "slug": "produto-01-atualizado",
-    "stock": 20,
-    "description": "Descrição do produto 01 atualizado",
-    "price": 49.9,
-    "price_with_discount": 0,
-    "category_ids": [1, 15, 24, 68],
-    "images": [
-      {
-        "type": "image/png",
-        "content": "base64 da imagem 1"
-      },
-      {
-        "id": 2,
-        "deleted": true
-      },
-      {
-        "id": 3,
-        "content": "base64 da imagem 3"
-      },
-      {
-        "id": 1,
-        "content": "https://store.com/media/product-01/image-01.jpg"
-      }
-    ],
-    "options": [
-      {
-        "id": 1,
-        "deleted": true,
-      }
-      {
-        "id": 2,
-        "radius": "10px",
-        "value": ["42/43", "44/45"]
-      },
-      {
-        "title": "Tipo",
-        "shape": "square",
-        "type": "text",
-        "values": ["100% algodão", "65% algodão"]
-      }
-    ]
-  }
-```
+| Código             | Quando                                                       |
+| ------------------ | ------------------------------------------------------------ |
+| `200 OK`           | Requisição bem-sucedida, com corpo de resposta               |
+| `201 Created`      | Recurso criado                                               |
+| `204 No Content`   | `PUT`/`DELETE` bem-sucedidos, sem corpo                      |
+| `400 Bad Request`  | Dados incorretos (ou cabeçalho `Authorization` ausente)      |
+| `401 Unauthorized` | Token inválido ou expirado                                   |
+| `404 Not Found`    | Recurso inexistente (inclui ids que não são números válidos) |
 
-**Response Status Code**
+Os erros retornam um JSON no formato `{ "message": "..." }`.
 
-- 204 No Content - Deve ser retornado quando a requisição foi bem sucedida mas nenhum corpo deve ser retornado.
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
+## Requisitos do projeto
 
-<details>
-  <summary><strong>Requisito 05 - Criar endpoint de atualização de produto</strong></summary><br>
+O escopo completo do projeto, com todos os requisitos, está no README oficial:
 
-- DELETE /v1/product/:id
-
-**Headers**
-
-- Content-type: application/json
-
-**Response Status Code**
-
-- 204 No Content - Deve ser retornado quando a requisição foi bem sucedida mas nenhum corpo deve ser retornado.
-- 401 Unauthorized - Deve ser retornado quando o token de autorização não for enviado ou estiver incorreto
-- 404 Not Found - Deve ser retornado quando o recurso solicitado não existe
-</details>
-
-## Seção 05 - Implementar e validar token JWT
-
-<details>
-  <summary><strong>Requisito 01 - Criar endpoint de geração do token JWT</strong></summary><br>
-
-- POST /v1/user/token
-
-**Headers**
-
-- Content-type: application/json
-
-**Payload**
-
-```json
-{
-  "email": "user@mail.com",
-  "password": "123@123"
-}
-```
-
-**Response body**
-
-```json
-{
-  "token": "<JWT>"
-}
-```
-
-**Response Status Code**
-
-- 200 OK - Deve ser retornado quando a requisição foi bem sucedida
-- 400 Bad Request - Deve ser retornado quando a os dados da requisição estiverem incorretos
-</details>
-
-<details>
-  <summary><strong>Requisito 02 - Validar token nos métodos POST, PUT e DELETE</strong></summary><br>
-
-Todos os endpoints POST, PUT e DELETE devem conter o cabeçalho `Authorization: Bearer <jwt>`, caso contrario a requisição
-deve ser rejeitada com o status code **400 Bad Request**
-
-<details>
+https://github.com/digitalcollegebr/projeto-backend/blob/main/README.md
