@@ -1,4 +1,5 @@
 const userService = require("../services/userService");
+const authService = require("../services/authService");
 
 async function getById(req, res, next) {
   try {
@@ -13,6 +14,15 @@ async function create(req, res, next) {
   try {
     const user = await userService.create(req.body);
     return res.status(201).json(user);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function token(req, res, next) {
+  try {
+    const result = await authService.generateToken(req.body);
+    return res.status(200).json(result);
   } catch (error) {
     return next(error);
   }
@@ -36,4 +46,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { getById, create, update, remove };
+module.exports = { getById, create, token, update, remove };

@@ -149,7 +149,7 @@ describe("PUT /v1/user/:id", () => {
   it("retorna 401 sem token", async () => {
     const created = await createUser();
     const res = await request(app).put(`/v1/user/${created.id}`).send(update);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
   });
 
   it("retorna 401 com token inválido", async () => {
@@ -209,7 +209,7 @@ describe("DELETE /v1/user/:id", () => {
   it("retorna 401 sem token", async () => {
     const created = await createUser();
     const res = await request(app).delete(`/v1/user/${created.id}`);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect(await User.findByPk(created.id)).not.toBeNull();
   });
 

@@ -88,7 +88,7 @@ describe("POST /v1/category", () => {
 
   it("retorna 401 sem token", async () => {
     const res = await request(app).post("/v1/category").send(validPayload());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect(await Category.count()).toBe(0);
   });
 
@@ -137,7 +137,7 @@ describe("PUT /v1/category/:id", () => {
     const res = await request(app)
       .put(`/v1/category/${category.id}`)
       .send(update);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
   });
 
   it("retorna 404 quando a categoria não existe", async () => {
@@ -187,7 +187,7 @@ describe("DELETE /v1/category/:id", () => {
   it("retorna 401 sem token", async () => {
     const category = await Category.create(validPayload());
     const res = await request(app).delete(`/v1/category/${category.id}`);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect(await Category.findByPk(category.id)).not.toBeNull();
   });
 

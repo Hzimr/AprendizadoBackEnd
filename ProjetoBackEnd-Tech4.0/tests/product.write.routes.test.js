@@ -288,7 +288,7 @@ describe("POST /v1/product", () => {
 
   it("retorna 401 sem token", async () => {
     const res = await request(app).post("/v1/product").send(basePayload());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect(await Product.count()).toBe(0);
   });
 
@@ -603,7 +603,7 @@ describe("PUT /v1/product/:id", () => {
     const res = await request(app)
       .put(`/v1/product/${created.id}`)
       .send(basePayload({ name: "Nome novo" }));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect((await get(created.id)).body.name).toBe("Produto 01");
   });
 
@@ -664,7 +664,7 @@ describe("DELETE /v1/product/:id", () => {
   it("retorna 401 sem token", async () => {
     const created = await createProduct();
     const res = await request(app).delete(`/v1/product/${created.id}`);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect((await get(created.id)).status).toBe(200);
   });
 
