@@ -9,4 +9,13 @@ async function search(req, res, next) {
   }
 }
 
-module.exports = { search };
+async function getById(req, res, next) {
+  try {
+    const product = await productService.getById(req.params.id);
+    return res.status(200).json(product);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { search, getById };

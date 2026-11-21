@@ -157,6 +157,97 @@ function groupBy(rows, key) {
   return groups;
 }
 
+// ---------- Montagem da resposta ----------
+
+// Recebe as linhas de produtos e monta os objetos da resposta com os campos
+// pedidos. Imagens, opções e category_ids só são buscados se estiverem em fields.
+async function buildItems(rows, fields) {
+  // Dados relacionados, só dos produtos recebidos e só se pedidos.
+  const productIds = rows.map((row) => row.id);
+  const inPage = { [Op.in]: productIds };
+
+  const categoriesByProduct = fields.includes("category_ids")
+    ? groupBy(
+        await ProductCategory.findAll({
+          where: { product_id: inPage },
+          attributes: ["product_id", "category_id"],
+          raw: true,
+        }),
+        "product_id",
+      )
+    : new Map();
+
+  const imagesByProduct = fields.includes("images")
+    ? groupBy(
+        await ProductImage.findAll({
+          where: { product_id: inPage },
+          attributes: ["id", "product_id", "path"],
+          order: [["id", "ASC"]],
+          raw: true,
+        }),
+        "product_id",
+      )
+    : new Map();
+
+  const optionsByProduct = fields.includes("options")
+    ? groupBy(
+        await ProductOption.findAll({
+          where: { product_id: inPage },
+          attributes: [
+            "id",
+            "product_id",
+            "title",
+            "shape",
+            "radius",
+            "type",
+            "values",
+          ],
+          order: [["id", "ASC"]],
+          raw: true,
+        }),
+        "product_id",
+      )
+    : new Map();
+
+  // Monta cada produto com os campos pedidos.
+  const data = rows.map((row) => {
+    const item = {};
+    fields.forEach((field) => {
+      switch (field) {
+        case "enabled":
+          item.enabled = Boolean(row.enabled);
+          break;
+        case "category_ids":
+          item.category_ids = (categoriesByProduct.get(row.id) || [])
+            .map((link) => link.category_id)
+            .sort((a, b) => a - b);
+          break;
+        case "images":
+          item.images = (imagesByProduct.get(row.id) || []).map((image) => ({
+            id: image.id,
+            content: image.path,
+          }));
+          break;
+        case "options":
+          item.options = (optionsByProduct.get(row.id) || []).map((option) => ({
+            id: option.id,
+            title: option.title,
+            shape: option.shape,
+            radius: option.radius,
+            type: option.type,
+            values: splitValues(option.values),
+          }));
+          break;
+        default:
+          item[field] = row[field];
+      }
+    });
+    return item;
+  });
+
+  return data;
+}
+
 // ---------- Busca ----------
 
 async function search(query = {}) {
@@ -234,90 +325,31 @@ async function search(query = {}) {
   const { rows, count } = await Product.findAndCountAll(findOptions);
   if (rows.length === 0) return { data: [], total: count, limit, page };
 
-  // 2) Dados relacionados, só dos produtos desta página e só se pedidos.
-  const productIds = rows.map((row) => row.id);
-  const inPage = { [Op.in]: productIds };
-
-  const categoriesByProduct = fields.includes("category_ids")
-    ? groupBy(
-        await ProductCategory.findAll({
-          where: { product_id: inPage },
-          attributes: ["product_id", "category_id"],
-          raw: true,
-        }),
-        "product_id",
-      )
-    : new Map();
-
-  const imagesByProduct = fields.includes("images")
-    ? groupBy(
-        await ProductImage.findAll({
-          where: { product_id: inPage },
-          attributes: ["id", "product_id", "path"],
-          order: [["id", "ASC"]],
-          raw: true,
-        }),
-        "product_id",
-      )
-    : new Map();
-
-  const optionsByProduct = fields.includes("options")
-    ? groupBy(
-        await ProductOption.findAll({
-          where: { product_id: inPage },
-          attributes: [
-            "id",
-            "product_id",
-            "title",
-            "shape",
-            "radius",
-            "type",
-            "values",
-          ],
-          order: [["id", "ASC"]],
-          raw: true,
-        }),
-        "product_id",
-      )
-    : new Map();
-
-  // 3) Monta a resposta com os campos pedidos.
-  const data = rows.map((row) => {
-    const item = {};
-    fields.forEach((field) => {
-      switch (field) {
-        case "enabled":
-          item.enabled = Boolean(row.enabled);
-          break;
-        case "category_ids":
-          item.category_ids = (categoriesByProduct.get(row.id) || [])
-            .map((link) => link.category_id)
-            .sort((a, b) => a - b);
-          break;
-        case "images":
-          item.images = (imagesByProduct.get(row.id) || []).map((image) => ({
-            id: image.id,
-            content: image.path,
-          }));
-          break;
-        case "options":
-          item.options = (optionsByProduct.get(row.id) || []).map((option) => ({
-            id: option.id,
-            title: option.title,
-            shape: option.shape,
-            radius: option.radius,
-            type: option.type,
-            values: splitValues(option.values),
-          }));
-          break;
-        default:
-          item[field] = row[field];
-      }
-    });
-    return item;
-  });
+  const data = await buildItems(rows, fields);
 
   return { data, total: count, limit, page };
 }
 
-module.exports = { search };
+// ---------- Busca por id ----------
+
+// Id inválido (não numérico, zero, negativo) equivale a recurso inexistente.
+async function getById(rawId) {
+  const id = Number(rawId);
+  const row =
+    Number.isInteger(id) && id >= 1
+      ? await Product.findOne({
+          where: { id },
+          attributes: SCALAR_FIELDS,
+          raw: true,
+        })
+      : null;
+
+  if (!row) {
+    throw new AppError(404, "Produto não encontrado");
+  }
+
+  const [product] = await buildItems([row], ALLOWED_FIELDS);
+  return product;
+}
+
+module.exports = { search, getById };
